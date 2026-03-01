@@ -40,10 +40,19 @@ app.get('/api/locate/:info', async (req, res) => {
   const { info } = req.params;
 
   try {
-    // Fetch data from ip-api.com
-    const response = await axios.get(`https://ip-api.com/json/${info}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,isp,org,as,asname,mobile,proxy,hosting,query`);
+    console.log(`[${new Date().toISOString()}] Fetching location data for: ${info}`);
+
+    // Fetch data from ip-api.com with proper headers (use HTTP for free tier)
+    const response = await axios.get(`http://ip-api.com/json/${info}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      timeout: 10000
+    });
 
     const apiData = response.data;
+    console.log(`[${new Date().toISOString()}] API Response status:`, apiData.status);
 
     if (apiData.status === 'fail') {
       return res.status(400).json({
@@ -52,31 +61,40 @@ app.get('/api/locate/:info', async (req, res) => {
       });
     }
 
-    // Save or update location data in database
-    const [location, created] = await Location.findOrCreate({
-      where: { info },
-      defaults: {
-        info,
-        description: apiData,
-      },
-      // Update if record exists
-      raw: false,
-    });
+    // Save or update location data in database (if database is available)
+    try {
+      const [location, created] = await Location.findOrCreate({
+        where: { info },
+        defaults: {
+          info,
+          description: apiData,
+        },
+        raw: false,
+      });
 
-    if (!created) {
-      // Update existing record
-      location.description = apiData;
-      await location.save();
+      if (!created) {
+        // Update existing record
+        location.description = apiData;
+        await location.save();
+      }
+
+      res.json({
+        success: true,
+        message: created ? 'Location data saved' : 'Location data updated',
+        data: apiData,
+        record: location,
+      });
+    } catch (dbError) {
+      // If database fails, still return the API data
+      console.warn('Database error (returning API data anyway):', dbError.message);
+      res.json({
+        success: true,
+        message: 'Location data retrieved (database unavailable)',
+        data: apiData,
+      });
     }
-
-    res.json({
-      success: true,
-      message: created ? 'Location data saved' : 'Location data updated',
-      data: apiData,
-      record: location,
-    });
   } catch (error) {
-    console.error('Error in /api/locate/:info route:', error.message);
+    console.error(`[${new Date().toISOString()}] Error in /api/locate/:info route:`, error.message, error.response?.status);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message,
