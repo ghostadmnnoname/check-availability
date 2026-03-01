@@ -1,32 +1,38 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('./index');
+/**
+ * Location Model for Supabase
+ * 
+ * This represents the structure of the locations table in Supabase
+ * Table: public.locations
+ */
 
-const Location = sequelize.define('Location', {
+const locationSchema = {
   id: {
-    type: DataTypes.UUID,
+    type: 'UUID',
     primaryKey: true,
-    defaultValue: DataTypes.UUIDV4,
+    default: 'gen_random_uuid()',
+    description: 'Unique identifier for the location record'
   },
   info: {
-    type: DataTypes.STRING,
-    allowNull: false,
+    type: 'TEXT',
     unique: true,
+    notNull: true,
+    description: 'The IP address or query parameter used to fetch location data'
   },
   description: {
-    type: DataTypes.JSONB,
-    allowNull: true,
+    type: 'JSONB',
+    nullable: true,
+    description: 'The JSON response from ip-api.com containing location details'
   },
-  createdAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
+  created_at: {
+    type: 'TIMESTAMP WITH TIME ZONE',
+    default: 'NOW()',
+    description: 'When the record was created'
   },
-  updatedAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
-}, {
-  tableName: 'locations',
-  timestamps: true,
-});
+  updated_at: {
+    type: 'TIMESTAMP WITH TIME ZONE',
+    default: 'NOW()',
+    description: 'When the record was last updated'
+  }
+};
 
-module.exports = Location;
+module.exports = locationSchema;

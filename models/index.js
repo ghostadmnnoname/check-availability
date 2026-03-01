@@ -1,19 +1,9 @@
-const { Sequelize } = require('sequelize');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-// Use the full PostgreSQL URL from Supabase
-const databaseUrl = process.env.check_availability_POSTGRES_PRISMA_URL || process.env.check_availability_POSTGRES_URL;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const sequelize = new Sequelize(databaseUrl, {
-  dialect: 'postgres',
-  logging: false,
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
-});
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-module.exports = sequelize;
+module.exports = supabase;

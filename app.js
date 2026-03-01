@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const sequelize = require('./models/index');
-const Location = require('./models/Location');
+const supabase = require('./models/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,19 +10,14 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database initialization
-sequelize.authenticate()
+// Initialize Supabase connection
+supabase.auth
+  .getSession()
   .then(() => {
-    console.log('✓ Database connected successfully');
+    console.log('✓ Supabase connected successfully');
   })
   .catch(err => {
-    console.error('✗ Database connection error:', err);
-  });
-
-// Sync database (creates table if it doesn't exist)
-sequelize.sync()
-  .catch(err => {
-    console.error('✗ Database sync error:', err);
+    console.error('✗ Supabase connection warning:', err.message);
   });
 
 // Routes
@@ -43,7 +37,7 @@ app.get('/api/locate/:info', async (req, res) => {
     console.log(`[${new Date().toISOString()}] Fetching location data for: ${info}`);
 
     // Fetch data from ip-api.com with proper headers (use HTTP for free tier)
-    const response = await axios.get(`http://ip-api.com/json/${info}`, {
+    const response = await axios.get(`http://ip-api.com/json`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
@@ -61,21 +55,53 @@ app.get('/api/locate/:info', async (req, res) => {
       });
     }
 
-    // Save or update location data in database (if database is available)
+    // Save or update location data in Supabase database
     try {
-      const [location, created] = await Location.findOrCreate({
-        where: { info },
-        defaults: {
-          info,
-          description: apiData,
-        },
-        raw: false,
-      });
+      // Check if record exists
+      const { data: existingRecord, error: fetchError } = await supabase
+        .from('locations')
+        .select('*')
+        .eq('info', info)
+        .single();
 
-      if (!created) {
+      let location;
+      let created = false;
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // PGRST116 means no rows found - that's expected for a new record
+        throw fetchError;
+      }
+
+      if (!existingRecord) {
+        // Insert new record
+        const { data, error } = await supabase
+          .from('locations')
+          .insert([
+            {
+              info,
+              description: apiData,
+            }
+          ])
+          .select()
+          .single();
+
+        if (error) throw error;
+        location = data;
+        created = true;
+      } else {
         // Update existing record
-        location.description = apiData;
-        await location.save();
+        const { data, error } = await supabase
+          .from('locations')
+          .update({
+            description: apiData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('info', info)
+          .select()
+          .single();
+
+        if (error) throw error;
+        location = data;
       }
 
       res.json({
