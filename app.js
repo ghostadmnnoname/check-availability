@@ -21,9 +21,6 @@ supabase.auth
   });
 
 // Routes
-app.get('/', (req, res) => {
-  res.send('Welcome to the Express App!');
-});
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
